@@ -8,7 +8,7 @@ namespace MyBackend.Controllers;
 public class ProfileController : ControllerBase
 {
     [HttpGet]
-    [Authorize]
+   // [Authorize]
     [HttpGet("GetProfile")]
     public IActionResult GetProfile()
     {

@@ -30,6 +30,10 @@ namespace MyBackend.Controllers
             {
                 return BadRequest(new { message = "Email and Password are required." });
             }
+            if (string.IsNullOrWhiteSpace(user.Phone))
+            {
+                return BadRequest(new { message = "Phone is required." });
+            }
 
             if (await _context.Users.AnyAsync(u => u.Email == user.Email))
             {
@@ -39,7 +43,7 @@ namespace MyBackend.Controllers
             using var hmac = new HMACSHA512();
             user.PasswordSalt = Convert.ToBase64String(hmac.Key); // تولید PasswordSalt
             user.PasswordHash = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(user.PasswordHash))); // هش رمز عبور
-
+            
             await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
 
@@ -50,11 +54,11 @@ namespace MyBackend.Controllers
         public async Task<IActionResult> Login([FromBody] User user)
         {
             if (string.IsNullOrWhiteSpace(user.PasswordHash) || string.IsNullOrWhiteSpace(user.Email))
-                return BadRequest(new { message = "Email and Password are requiredd." });
+                return BadRequest(new { message = "Email and Password are required." });
 
             var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == user.Email);
             if (existingUser == null)
-                return Unauthorized(new { message = "Invalid email or password1." });
+                return Unauthorized(new { message = "Invalid email or password." });
 
             using var hmac = new HMACSHA512(Convert.FromBase64String(existingUser.PasswordSalt));
             var computedHash = Convert.ToBase64String(hmac.ComputeHash(Encoding.UTF8.GetBytes(user.PasswordHash)));
@@ -62,7 +66,7 @@ namespace MyBackend.Controllers
                 return Unauthorized(new { message = "Invalid email or password." });
 
             var token = GenerateJwtToken(existingUser);
-            return Ok(new { token });
+            return Ok(new { token,email = existingUser.Email,phone = existingUser.Phone});
         }
 
         private string GenerateJwtToken(User user)
@@ -71,7 +75,9 @@ namespace MyBackend.Controllers
             {
                 new Claim(JwtRegisteredClaimNames.Sub, user.Email),
                 new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString())
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Email, user.Email),
+                new Claim("Phone", user.Phone),
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"] ?? string.Empty));
